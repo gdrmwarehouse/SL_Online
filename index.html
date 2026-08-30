@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ticket Kedatangan RM — Service Level</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --paper:#EDEAE2;
+    --paper-raised:#F6F4EE;
+    --ink:#1F2A33;
+    --ink-soft:#5B6570;
+    --line:#C9C2B4;
+    --p1111:#2B6CB0;
+    --p1112:#B8622E;
+    --p1113:#3E7A54;
+    --alert:#A43B32;
+    --radius:2px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Public Sans', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.label-brand{
+    font-family:'Barlow Condensed', sans-serif;
+    letter-spacing:.02em;
+    text-transform:uppercase;
+  }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 20px; border-bottom:2px solid var(--ink);
+    background:var(--paper-raised);
+  }
+  .topbar .title{ font-size:22px; font-weight:700; }
+  .topbar .title .mono{ font-size:12px; color:var(--ink-soft); display:block; letter-spacing:.08em; text-transform:none; }
+  .conn-banner{
+    font-size:12px; padding:4px 10px; border:1px dashed var(--alert); color:var(--alert);
+    font-family:'IBM Plex Mono', monospace;
+  }
+
+  .plant-tabs{ display:flex; gap:0; padding:0 20px; background:var(--paper-raised); }
+  .plant-tab{
+    padding:10px 22px; font-family:'Barlow Condensed', sans-serif; font-weight:600;
+    font-size:16px; text-transform:uppercase; letter-spacing:.03em;
+    border:2px solid var(--ink); border-bottom:none; border-radius:6px 6px 0 0;
+    margin-right:6px; margin-top:8px; cursor:pointer; background:var(--paper);
+    color:var(--ink-soft); position:relative; top:2px;
+  }
+  .plant-tab.active{ background:var(--ink); color:var(--paper-raised); top:0; }
+  .plant-tab[data-plant="1111"].active{ background:var(--p1111); border-color:var(--p1111); }
+  .plant-tab[data-plant="1112"].active{ background:var(--p1112); border-color:var(--p1112); }
+  .plant-tab[data-plant="1113"].active{ background:var(--p1113); border-color:var(--p1113); }
+
+  .layout{
+    display:grid; grid-template-columns: 1.3fr 1fr; gap:22px;
+    padding:22px; max-width:1180px; margin:0 auto;
+  }
+  @media (max-width: 880px){ .layout{ grid-template-columns:1fr; } }
+
+  .card{
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius);
+    padding:18px 20px;
+  }
+  .card + .card{ margin-top:18px; }
+  .section-title{
+    font-size:14px; font-weight:600; color:var(--ink-soft); margin:0 0 12px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .section-title .n{ font-family:'IBM Plex Mono', monospace; color:var(--ink); }
+
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:12px 14px; }
+  .field{ display:flex; flex-direction:column; gap:5px; margin-bottom:12px; }
+  .field label{ font-size:12px; color:var(--ink-soft); font-weight:500; }
+  .field input, .field select, .field textarea{
+    font-family:'Public Sans', sans-serif; font-size:14px; padding:9px 10px;
+    border:1px solid var(--line); border-radius:var(--radius); background:#fff; color:var(--ink);
+  }
+  .field textarea{ resize:vertical; min-height:44px; }
+  .field input:focus, .field select:focus, .field textarea:focus{
+    outline:2px solid var(--ink); outline-offset:1px;
+  }
+
+  .access-row{ display:flex; gap:10px; align-items:flex-end; margin-bottom:16px; }
+  .access-row .field{ margin-bottom:0; flex:1; }
+
+  .submit-btn{
+    width:100%; padding:14px; font-family:'Barlow Condensed', sans-serif; font-weight:700;
+    font-size:18px; letter-spacing:.03em; text-transform:uppercase; color:#fff;
+    background:var(--ink); border:none; border-radius:var(--radius); cursor:pointer; margin-top:6px;
+  }
+  .submit-btn:disabled{ background:#9aa2a8; cursor:not-allowed; }
+  .submit-btn:active{ transform:translateY(1px); }
+
+  .status-msg{ font-size:13px; margin-top:10px; font-family:'IBM Plex Mono', monospace; }
+  .status-msg.ok{ color:var(--p1113); }
+  .status-msg.err{ color:var(--alert); }
+
+  /* --- signature element: live shipping-tag preview --- */
+  .ticket{
+    position:sticky; top:20px;
+    background:#fff; border:2px solid var(--ink); border-radius:6px;
+    padding:0; overflow:hidden;
+  }
+  .ticket-head{
+    padding:12px 16px; color:#fff; display:flex; justify-content:space-between; align-items:center;
+  }
+  .ticket-head .label-brand{ font-size:13px; font-weight:600; }
+  .ticket-head .plant-no{ font-family:'IBM Plex Mono', monospace; font-size:20px; font-weight:600; }
+  .ticket-body{ padding:16px; }
+  .ticket-perf{
+    height:0; border-top:2px dashed var(--line); margin:0 16px; position:relative;
+  }
+  .ticket-perf::before, .ticket-perf::after{
+    content:''; position:absolute; top:-9px; width:18px; height:18px; border-radius:50%; background:var(--paper);
+    border:2px solid var(--ink);
+  }
+  .ticket-perf::before{ left:-27px; }
+  .ticket-perf::after{ right:-27px; }
+  .qr-wrap{ display:flex; justify-content:center; padding:16px 0 6px; }
+  .ticket-lines{ font-family:'IBM Plex Mono', monospace; font-size:12.5px; line-height:1.7; white-space:pre-wrap; color:var(--ink); }
+  .ticket-lines b{ color:var(--ink-soft); font-weight:600; }
+  .ticket-footer{ padding:10px 16px 16px; font-family:'IBM Plex Mono', monospace; font-size:10.5px; color:var(--ink-soft); text-align:center; }
+
+  /* today board */
+  table.board{ width:100%; border-collapse:collapse; font-size:13px; }
+  table.board th{
+    text-align:left; font-family:'Barlow Condensed', sans-serif; font-weight:600; text-transform:uppercase;
+    font-size:12px; color:var(--ink-soft); border-bottom:2px solid var(--ink); padding:6px 8px;
+  }
+  table.board td{ padding:7px 8px; border-bottom:1px solid var(--line); font-family:'IBM Plex Mono', monospace; }
+  .badge{ display:inline-block; padding:2px 7px; border-radius:3px; color:#fff; font-size:11px; font-weight:600; }
+  .empty-row{ color:var(--ink-soft); font-family:'Public Sans', sans-serif; padding:16px 8px; text-align:center; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="title">Ticket Kedatangan RM
+    <span class="mono">SERVICE LEVEL — REAL-TIME TRACEABILITY</span>
+  </div>
+  <div id="connBanner" class="conn-banner" style="display:none;">SUPABASE_URL / KEY BELUM DIISI — lihat komentar di kode</div>
+</div>
+
+<div class="plant-tabs" id="plantTabs">
+  <div class="plant-tab active" data-plant="1111">Plant 1111</div>
+  <div class="plant-tab" data-plant="1112">Plant 1112</div>
+  <div class="plant-tab" data-plant="1113">Plant 1113</div>
+</div>
+
+<div class="layout">
+  <!-- FORM COLUMN -->
+  <div>
+    <div class="card">
+      <div class="section-title"><span class="n">00</span> Kode Akses</div>
+      <div class="access-row">
+        <div class="field">
+          <label>Kode akses plant ini</label>
+          <input type="text" id="accessCode" placeholder="Masukkan kode dari supervisor">
+        </div>
+      </div>
+
+      <div class="section-title"><span class="n">01</span> Waktu &amp; Kendaraan</div>
+      <div class="grid2">
+        <div class="field"><label>No. Ritase</label><input type="number" id="no_ritase"></div>
+        <div class="field"><label>Nopol Mobil</label><input type="text" id="nopol_mobil" placeholder="B 9411 YN"></div>
+        <div class="field"><label>Tanggal Kedatangan</label><input type="date" id="tanggal_kedatangan"></div>
+        <div class="field"><label>Tanggal Keluar</label><input type="date" id="tanggal_keluar"></div>
+        <div class="field"><label>Jam Masuk</label><input type="time" id="jam_masuk"></div>
+        <div class="field"><label>Jam Pengecekan QC</label><input type="time" id="jam_qc"></div>
+        <div class="field"><label>Jam Start Bongkar</label><input type="time" id="jam_start_bongkar"></div>
+        <div class="field"><label>Jam Selesai Bongkar</label><input type="time" id="jam_selesai_bongkar"></div>
+        <div class="field"><label>Jam Keluar</label><input type="time" id="jam_keluar"></div>
+      </div>
+
+      <div class="section-title"><span class="n">02</span> Material</div>
+      <div class="grid2">
+        <div class="field"><label>No SKU</label><input type="text" id="no_sku" list="skuList" placeholder="1104100045"><datalist id="skuList"></datalist></div>
+        <div class="field"><label>Merk Raw Material</label><input type="text" id="merk_rm"></div>
+        <div class="field"><label>Produsen</label><input type="text" id="produsen"></div>
+        <div class="field"><label>Jumlah RM (zak/pail/pcs)</label><input type="number" id="jumlah_rm"></div>
+        <div class="field"><label>Jumlah Berat (kg)</label><input type="number" id="jumlah_berat"></div>
+        <div class="field"><label>Tanggal Expired</label><input type="date" id="expired_date"></div>
+      </div>
+
+      <div class="section-title"><span class="n">03</span> Dokumen &amp; Catatan</div>
+      <div class="grid2">
+        <div class="field"><label>Nomor PO</label><input type="text" id="nomor_po"></div>
+        <div class="field"><label>Dokumen GR</label><input type="text" id="dokumen_gr"></div>
+        <div class="field"><label>Nama Supplier</label><input type="text" id="nama_supplier"></div>
+        <div class="field"><label>Status</label>
+          <select id="status_approved">
+            <option value="PENDING">Pending</option>
+            <option value="APPROVED">Approved</option>
+            <option value="REJECTED">Rejected</option>
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>Keterangan</label><textarea id="keterangan"></textarea></div>
+      <div class="field"><label>Note</label><textarea id="note"></textarea></div>
+
+      <button class="submit-btn" id="submitBtn">Simpan &amp; Cetak Label</button>
+      <button type="button" id="cancelEditBtn" style="display:none; margin-top:8px; width:100%; padding:10px; background:none; border:1px solid var(--line); border-radius:2px; color:var(--ink-soft); cursor:pointer; font-family:'Public Sans',sans-serif; font-size:13px;">Batal edit — kembali ke input baru</button>
+      <div id="statusMsg" class="status-msg"></div>
+    </div>
+  </div>
+
+  <!-- LIVE LABEL PREVIEW -->
+  <div>
+    <div class="ticket">
+      <div class="ticket-head" id="ticketHead" style="background:var(--p1111);">
+        <span class="label-brand">Label Traceability</span>
+        <span class="plant-no" id="ticketPlant">1111</span>
+      </div>
+      <div class="qr-wrap"><div id="qrcode"></div></div>
+      <div class="ticket-perf"></div>
+      <div class="ticket-body">
+        <div class="ticket-lines" id="ticketLines">Isi form di kiri — label ini update otomatis.</div>
+      </div>
+      <div class="ticket-footer">QR di-generate langsung di browser · tidak perlu API luar</div>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+      <div class="section-title"><span class="n">•</span> Kedatangan Hari Ini</div>
+      <table class="board">
+        <thead><tr><th>Plant</th><th>Batch</th><th>SKU</th><th>Supplier</th><th>Status</th></tr></thead>
+        <tbody id="boardBody"><tr><td colspan="5" class="empty-row">Menunggu koneksi Supabase…</td></tr></tbody>
+      </table>
+      <p style="font-size:12px; color:var(--ink-soft); margin:10px 2px 0;">Klik satu baris untuk edit atau cetak ulang label-nya.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   GANTI DUA BARIS INI dengan project Supabase kamu sendiri:
+   Supabase Dashboard > Project Settings > API
+   ============================================================ */
+const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';
+const SUPABASE_ANON_KEY = 'YOUR-ANON-PUBLIC-KEY';
+
+const PLANT_COLORS = { 1111:'#2B6CB0', 1112:'#B8622E', 1113:'#3E7A54' };
+let currentPlant = 1111;
+let supabase = null;
+
+if (SUPABASE_URL.includes('YOUR-PROJECT') || SUPABASE_ANON_KEY.includes('YOUR-ANON')) {
+  document.getElementById('connBanner').style.display = 'inline-block';
+} else {
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+// --- plant tabs ---
+document.querySelectorAll('.plant-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.plant-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentPlant = parseInt(tab.dataset.plant, 10);
+    document.getElementById('ticketPlant').textContent = currentPlant;
+    document.getElementById('ticketHead').style.background = PLANT_COLORS[currentPlant];
+    updateTicket();
+    loadBoard();
+  });
+});
+
+// --- live label preview (signature element) ---
+const qrEl = document.getElementById('qrcode');
+let qr = null;
+const fields = ['no_ritase','tanggal_kedatangan','nopol_mobil','no_sku','merk_rm','produsen',
+  'nomor_po','dokumen_gr','nama_supplier','expired_date','jumlah_rm','jumlah_berat','keterangan','note'];
+fields.forEach(id => document.getElementById(id).addEventListener('input', updateTicket));
+
+function batchCode() {
+  const d = document.getElementById('tanggal_kedatangan').value;
+  const ritase = document.getElementById('no_ritase').value || '00';
+  if (!d) return '';
+  const [y,m,day] = d.split('-');
+  return `${y}${m}${day}${String(ritase).padStart(2,'0')}`;
+}
+
+function updateTicket() {
+  const v = id => document.getElementById(id).value || '—';
+  const batch = batchCode();
+  const qrText = batch ? `${currentPlant}x${v('no_sku')}x${batch}` : '';
+
+  document.getElementById('ticketLines').innerHTML =
+    `<b>TGL DATANG</b>  ${v('tanggal_kedatangan')}\n` +
+    `<b>SKU RM</b>      ${v('no_sku')}\n` +
+    `<b>MERK</b>        ${v('merk_rm')}\n` +
+    `<b>SUPPLIER</b>    ${v('nama_supplier')}\n` +
+    `<b>PRODUSEN</b>    ${v('produsen')}\n` +
+    `<b>NO BATCH</b>    ${batch || '—'}\n` +
+    `<b>EXPIRED</b>     ${v('expired_date')}\n` +
+    `<b>PO / GR</b>     ${v('nomor_po')} / ${v('dokumen_gr')}\n` +
+    `<b>KET</b>         ${v('keterangan')}`;
+
+  qrEl.innerHTML = '';
+  if (qrText) {
+    qr = new QRCode(qrEl, { text: qrText, width:120, height:120, colorDark:'#1F2A33', colorLight:'#ffffff' });
+  }
+}
+updateTicket();
+
+// --- load SKU list for the datalist (from sku_database) ---
+async function loadSkuList() {
+  if (!supabase) return;
+  const { data, error } = await supabase.from('sku_database').select('no_sku, nama_rm').limit(500);
+  if (error || !data) return;
+  document.getElementById('skuList').innerHTML =
+    data.map(r => `<option value="${r.no_sku}">${r.nama_rm || ''}</option>`).join('');
+}
+
+// --- today's board (realtime) ---
+let boardData = [];
+let editingId = null;
+const BOARD_COLUMNS = 'id, plant, no_ritase, tanggal_kedatangan, tanggal_keluar, jam_masuk, jam_qc, ' +
+  'jam_start_bongkar, jam_selesai_bongkar, jam_keluar, nopol_mobil, no_sku, merk_rm, produsen, ' +
+  'nomor_po, dokumen_gr, jumlah_rm, jumlah_berat, nama_supplier, expired_date, keterangan, note, ' +
+  'status_approved, no_batch';
+
+async function loadBoard() {
+  const body = document.getElementById('boardBody');
+  if (!supabase) { body.innerHTML = '<tr><td colspan="5" class="empty-row">Isi SUPABASE_URL &amp; ANON_KEY dulu di kode.</td></tr>'; return; }
+
+  const { data, error } = await supabase
+    .from('raw_material_arrivals')
+    .select(BOARD_COLUMNS)
+    .eq('plant', currentPlant)
+    .order('created_at', { ascending:false })
+    .limit(15);
+
+  if (error) { body.innerHTML = `<tr><td colspan="5" class="empty-row">Gagal memuat: ${error.message}</td></tr>`; return; }
+  boardData = data || [];
+  if (boardData.length === 0) { body.innerHTML = '<tr><td colspan="5" class="empty-row">Belum ada input hari ini untuk plant ini.</td></tr>'; return; }
+
+  body.innerHTML = boardData.map((r, i) => `
+    <tr data-idx="${i}" style="cursor:pointer;" onclick="loadForEdit(${i})">
+      <td><span class="badge" style="background:${PLANT_COLORS[r.plant]}">${r.plant}</span></td>
+      <td>${r.no_batch || '—'}</td>
+      <td>${r.no_sku || '—'}</td>
+      <td>${r.nama_supplier || '—'}</td>
+      <td>${r.status_approved || '—'}</td>
+    </tr>`).join('');
+}
+
+function loadForEdit(idx) {
+  const r = boardData[idx];
+  if (!r) return;
+  editingId = r.id;
+
+  const set = (id, v) => document.getElementById(id).value = (v === null || v === undefined) ? '' : v;
+  set('no_ritase', r.no_ritase); set('tanggal_kedatangan', r.tanggal_kedatangan); set('tanggal_keluar', r.tanggal_keluar);
+  set('jam_masuk', r.jam_masuk); set('jam_qc', r.jam_qc); set('jam_start_bongkar', r.jam_start_bongkar);
+  set('jam_selesai_bongkar', r.jam_selesai_bongkar); set('jam_keluar', r.jam_keluar); set('nopol_mobil', r.nopol_mobil);
+  set('no_sku', r.no_sku); set('merk_rm', r.merk_rm); set('produsen', r.produsen);
+  set('nomor_po', r.nomor_po); set('dokumen_gr', r.dokumen_gr); set('jumlah_rm', r.jumlah_rm);
+  set('jumlah_berat', r.jumlah_berat); set('nama_supplier', r.nama_supplier); set('expired_date', r.expired_date);
+  set('keterangan', r.keterangan); set('note', r.note); set('status_approved', r.status_approved || 'PENDING');
+  document.getElementById('accessCode').value = '';
+
+  document.getElementById('submitBtn').textContent = 'Update & Cetak Ulang Label';
+  document.getElementById('cancelEditBtn').style.display = 'block';
+  document.getElementById('statusMsg').textContent = `Mode edit — batch ${r.no_batch}. Masukkan kode akses untuk menyimpan perubahan.`;
+  document.getElementById('statusMsg').className = 'status-msg';
+  updateTicket();
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+function exitEditMode() {
+  editingId = null;
+  document.querySelectorAll('.field input, .field textarea, .field select').forEach(el => {
+    if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
+  });
+  document.getElementById('accessCode').value = '';
+  document.getElementById('submitBtn').textContent = 'Simpan & Cetak Label';
+  document.getElementById('cancelEditBtn').style.display = 'none';
+  updateTicket();
+}
+document.getElementById('cancelEditBtn').addEventListener('click', () => {
+  exitEditMode();
+  document.getElementById('statusMsg').textContent = '';
+});
+
+// --- submit ---
+document.getElementById('submitBtn').addEventListener('click', async () => {
+  const statusMsg = document.getElementById('statusMsg');
+  if (!supabase) { statusMsg.textContent = 'Belum tersambung ke Supabase — isi SUPABASE_URL & ANON_KEY di kode.'; statusMsg.className='status-msg err'; return; }
+
+  const code = document.getElementById('accessCode').value.trim();
+  if (!code) { statusMsg.textContent = 'Masukkan kode akses dulu.'; statusMsg.className='status-msg err'; return; }
+
+  const val = id => document.getElementById(id).value || null;
+  const row = {
+    plant: currentPlant,
+    access_code_used: code,
+    no_ritase: val('no_ritase') ? parseInt(val('no_ritase')) : null,
+    tanggal_kedatangan: val('tanggal_kedatangan'),
+    tanggal_keluar: val('tanggal_keluar'),
+    jam_masuk: val('jam_masuk'),
+    jam_qc: val('jam_qc'),
+    jam_start_bongkar: val('jam_start_bongkar'),
+    jam_selesai_bongkar: val('jam_selesai_bongkar'),
+    jam_keluar: val('jam_keluar'),
+    nopol_mobil: val('nopol_mobil'),
+    no_sku: val('no_sku'),
+    merk_rm: val('merk_rm'),
+    produsen: val('produsen'),
+    nomor_po: val('nomor_po'),
+    dokumen_gr: val('dokumen_gr'),
+    jumlah_rm: val('jumlah_rm') ? parseFloat(val('jumlah_rm')) : null,
+    jumlah_berat: val('jumlah_berat') ? parseFloat(val('jumlah_berat')) : null,
+    nama_supplier: val('nama_supplier'),
+    expired_date: val('expired_date'),
+    keterangan: val('keterangan'),
+    status_approved: val('status_approved'),
+    note: val('note')
+  };
+
+  if (!row.tanggal_kedatangan) { statusMsg.textContent = 'Tanggal kedatangan wajib diisi.'; statusMsg.className='status-msg err'; return; }
+
+  document.getElementById('submitBtn').disabled = true;
+  const query = editingId
+    ? supabase.from('raw_material_arrivals').update(row).eq('id', editingId)
+    : supabase.from('raw_material_arrivals').insert(row);
+  const { error } = await query;
+  document.getElementById('submitBtn').disabled = false;
+
+  if (error) {
+    statusMsg.textContent = 'Gagal simpan: ' + error.message + ' (kode akses salah, atau data ini sudah lewat hari ini)';
+    statusMsg.className = 'status-msg err';
+  } else {
+    statusMsg.textContent = editingId
+      ? 'Perubahan tersimpan — label & spreadsheet ikut ter-update.'
+      : 'Tersimpan — masuk ke spreadsheet otomatis dalam beberapa detik.';
+    statusMsg.className = 'status-msg ok';
+    if (editingId) exitEditMode(); else document.getElementById('accessCode').focus();
+    loadBoard();
+  }
+});
+
+loadSkuList();
+loadBoard();
+if (supabase) setInterval(loadBoard, 8000); // refresh ringan tiap 8 detik (tanpa perlu buka koneksi realtime penuh)
+</script>
+</body>
+</html>
