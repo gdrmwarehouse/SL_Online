@@ -1,0 +1,28 @@
+name: Sync arrival to Google Sheet
+
+# Dipicu dari luar (oleh Supabase Database Webhook), BUKAN oleh perubahan kode.
+# Supabase akan memanggil endpoint GitHub API "repository_dispatch" tiap ada
+# insert/update baru di tabel raw_material_arrivals.
+on:
+  repository_dispatch:
+    types: [new-arrival]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install googleapis
+        run: npm install googleapis@131
+
+      - name: Append row to Google Sheet
+        env:
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          ROW_JSON: ${{ toJson(github.event.client_payload) }}
+        run: node scripts/sync-to-sheet.js
