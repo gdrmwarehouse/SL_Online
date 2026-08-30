@@ -250,12 +250,12 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const PLANT_COLORS = { 1111:'#2B6CB0', 1112:'#B8622E', 1113:'#3E7A54' };
 let currentPlant = 1111;
-let supabase = null;
+let supabaseClient = null;
 
 if (SUPABASE_URL.includes('YOUR-PROJECT') || SUPABASE_ANON_KEY.includes('YOUR-ANON')) {
   document.getElementById('connBanner').style.display = 'inline-block';
 } else {
-  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
 // --- plant tabs ---
@@ -311,8 +311,8 @@ updateTicket();
 
 // --- load SKU list for the datalist (from sku_database) ---
 async function loadSkuList() {
-  if (!supabase) return;
-  const { data, error } = await supabase.from('sku_database').select('no_sku, nama_rm').limit(500);
+  if (!supabaseClient) return;
+  const { data, error } = await supabaseClient.from('sku_database').select('no_sku, nama_rm').limit(500);
   if (error || !data) return;
   document.getElementById('skuList').innerHTML =
     data.map(r => `<option value="${r.no_sku}">${r.nama_rm || ''}</option>`).join('');
@@ -328,9 +328,9 @@ const BOARD_COLUMNS = 'id, plant, no_ritase, tanggal_kedatangan, tanggal_keluar,
 
 async function loadBoard() {
   const body = document.getElementById('boardBody');
-  if (!supabase) { body.innerHTML = '<tr><td colspan="5" class="empty-row">Isi SUPABASE_URL &amp; ANON_KEY dulu di kode.</td></tr>'; return; }
+  if (!supabaseClient) { body.innerHTML = '<tr><td colspan="5" class="empty-row">Isi SUPABASE_URL &amp; ANON_KEY dulu di kode.</td></tr>'; return; }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('raw_material_arrivals')
     .select(BOARD_COLUMNS)
     .eq('plant', currentPlant)
@@ -392,7 +392,7 @@ document.getElementById('cancelEditBtn').addEventListener('click', () => {
 // --- submit ---
 document.getElementById('submitBtn').addEventListener('click', async () => {
   const statusMsg = document.getElementById('statusMsg');
-  if (!supabase) { statusMsg.textContent = 'Belum tersambung ke Supabase — isi SUPABASE_URL & ANON_KEY di kode.'; statusMsg.className='status-msg err'; return; }
+  if (!supabaseClient) { statusMsg.textContent = 'Belum tersambung ke Supabase — isi SUPABASE_URL & ANON_KEY di kode.'; statusMsg.className='status-msg err'; return; }
 
   const code = document.getElementById('accessCode').value.trim();
   if (!code) { statusMsg.textContent = 'Masukkan kode akses dulu.'; statusMsg.className='status-msg err'; return; }
@@ -428,8 +428,8 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
 
   document.getElementById('submitBtn').disabled = true;
   const query = editingId
-    ? supabase.from('raw_material_arrivals').update(row).eq('id', editingId)
-    : supabase.from('raw_material_arrivals').insert(row);
+    ? supabaseClient.from('raw_material_arrivals').update(row).eq('id', editingId)
+    : supabaseClient.from('raw_material_arrivals').insert(row);
   const { error } = await query;
   document.getElementById('submitBtn').disabled = false;
 
@@ -448,7 +448,7 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
 
 loadSkuList();
 loadBoard();
-if (supabase) setInterval(loadBoard, 8000); // refresh ringan tiap 8 detik (tanpa perlu buka koneksi realtime penuh)
+if (supabaseClient) setInterval(loadBoard, 8000); // refresh ringan tiap 8 detik (tanpa perlu buka koneksi realtime penuh)
 </script>
 </body>
 </html>
